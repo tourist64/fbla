@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Body Diversity (drilldown)</title>
+<style>
+  :root{--ink:#1c2533;--muted:#5c6675;--line:#e3e7ee;--accent:#6a4ea3;--rec-key:#3a8063;--bg:#f4f5f8;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:"Segoe UI",system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif;line-height:1.5;display:flex;justify-content:center}
+  .chart-card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin:24px 16px;max-width:840px;width:100%;box-shadow:0 6px 24px rgba(30,40,60,.06)}
+  .chart-title{font-size:16px;font-weight:700;margin:0 0 2px}
+  .chart-note{font-size:12.5px;color:var(--muted);margin:0 0 10px}
+  .controls{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 12px;align-items:center}
+  .btn{border:1px solid var(--line);background:#fff;color:var(--ink);font:inherit;font-size:12.5px;font-weight:600;padding:6px 13px;border-radius:999px;cursor:pointer;transition:.15s}
+  .btn:hover{border-color:var(--accent);color:var(--accent)}
+  .btn.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .btn.back{border-color:var(--accent);color:var(--accent)}
+  svg{display:block;width:100%;height:auto;overflow:visible;touch-action:none}
+  .tip{position:fixed;pointer-events:none;background:#1c2533;color:#fff;font-size:12.5px;padding:8px 11px;border-radius:9px;opacity:0;transition:opacity .12s;z-index:50;max-width:240px;box-shadow:0 8px 24px rgba(0,0,0,.25);line-height:1.45}
+  .tip .k{color:#9fb4d8}
+  .reveal{font-size:13px;color:var(--rec-key);font-weight:600;margin-top:10px;min-height:18px}
+  .tlab{fill:var(--muted);font-size:11px}.grid{stroke:#eceef3;stroke-width:1}.axis{stroke:#cdd4df;stroke-width:1}
+  .drillhint{fill:var(--accent);font-size:11.5px;font-weight:700}
+</style>
+</head><body>
+<div class="chart-card">
+  <p class="chart-title">Average height vs weight by sport, Rio 2016 — click the cluster to zoom in</p>
+  <p class="chart-note">The crowded center hides a dozen overlapping sports. <b>Click into the core cluster</b> for an animated zoom that separates them; toggle the ≥195 cm bed-overflow zone.</p>
+  <div class="controls" id="ctl-body"></div>
+  <svg id="svg-body" viewBox="0 0 760 400" role="img"></svg>
+  <div class="reveal" id="rev-body"></div>
+</div>
+<div class="tip" id="tip"></div>
+<script>
+const SVGNS="http://www.w3.org/2000/svg";const tip=document.getElementById('tip');
+function el(t,a={}){const e=document.createElementNS(SVGNS,t);for(const k in a)e.setAttribute(k,a[k]);return e;}
+function txt(e,s){e.textContent=s;return e;}
+function showTip(html,evt){tip.innerHTML=html;tip.style.opacity=1;moveTip(evt);}
+function moveTip(evt){const x=evt.clientX,y=evt.clientY;tip.style.left=Math.min(x+14,innerWidth-tip.offsetWidth-10)+'px';tip.style.top=(y-10-tip.offsetHeight)+'px';if(y-tip.offsetHeight<10)tip.style.top=(y+18)+'px';}
+function hideTip(){tip.style.opacity=0;}
+function lerp(a,b,t){return a+(b-a)*t;}
+function ease(t){return t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;}
+function animate(dur,cb,done){const s=performance.now();function f(n){let t=Math.min(1,(n-s)/dur);cb(ease(t));if(t<1)requestAnimationFrame(f);else if(done)done();}requestAnimationFrame(f);}
+function mkBtns(host,items,onpick){host.innerHTML='';const btns=[];items.forEach(it=>{const b=document.createElement('button');b.className='btn'+(it.on?' on':'')+(it.cls?' '+it.cls:'');b.textContent=it.label;
+  b.onclick=()=>{if(it.toggle){b.classList.toggle('on');onpick(it,b.classList.contains('on'),btns);}else{if(!it.act){btns.forEach(x=>{if(!x._toggle)x.classList.remove('on')});b.classList.add('on');}onpick(it,true,btns);}};b._toggle=!!it.toggle;host.appendChild(b);btns.push(b);});return btns;}
+
+(function(){
+  const d=[["Gymnastics",162,56,324,"C"],["Diving",167,60,140,"C"],["Weightlifting",167,80,260,"C"],
+    ["Basketball",192,88,288,"T"],["Volleyball",190,80,288,"T"],["Water Polo",186,85,338,"T"],["Rowing",185,82,550,"T"],["Handball",186,84,336,"T"],
+    ["Athletics",176,69,2300,"X"],["Swimming",180,73,900,"X"],["Football",178,73,500,"X"],["Cycling",177,69,520,"X"],
+    ["Boxing",174,69,286,"X"],["Judo",174,78,386,"X"],["Wrestling",173,79,344,"X"],["Fencing",177,71,210,"X"],
+    ["Hockey",175,70,400,"X"],["Shooting",175,76,390,"X"],["Triathlon",176,64,110,"X"],["Canoe",179,77,330,"X"]];
+  const catCol={C:"#d6248f",T:"#2f7ed8",X:"#e8821e"},catName={C:"Compact builds",T:"Tall & powerful",X:"Typical core"};
+  const svg=document.getElementById('svg-body'),W=760,H=400,m={l:54,r:18,t:18,b:46};
+  const full=[[158,196],[48,95]],core=[[170,182],[62,84]];
+  let dom=[full[0].slice(),full[1].slice()],zoomed=false,iso=null,zone=false;
+  function draw(){svg.innerHTML='';const xr=dom[0],yr=dom[1];
+    const X=x=>m.l+(x-xr[0])/(xr[1]-xr[0])*(W-m.l-m.r),Y=y=>H-m.b-(y-yr[0])/(yr[1]-yr[0])*(H-m.t-m.b);
+    if(zone&&195<=xr[1]){svg.appendChild(el('rect',{x:X(Math.max(195,xr[0])),y:m.t,width:W-m.r-X(Math.max(195,xr[0])),height:H-m.b-m.t,fill:'#6a4ea3',opacity:.08}));
+      svg.appendChild(txt(el('text',{x:X(Math.max(195,xr[0]))+6,y:m.t+16,class:'tlab',fill:'#6a4ea3','font-weight':'700'}),'≥195 cm · overflows a 190 cm bed'));}
+    const xs=Math.ceil(xr[0]/5)*5;for(let v=xs;v<=xr[1];v+=5){const x=X(v);svg.appendChild(el('line',{x1:x,y1:m.t,x2:x,y2:H-m.b,class:'grid'}));svg.appendChild(txt(el('text',{x,y:H-m.b+18,'text-anchor':'middle',class:'tlab'}),v));}
+    const ys=Math.ceil(yr[0]/5)*5;for(let v=ys;v<=yr[1];v+=5){const y=Y(v);svg.appendChild(el('line',{x1:m.l,y1:y,x2:W-m.r,y2:y,class:'grid'}));svg.appendChild(txt(el('text',{x:m.l-8,y:y+4,'text-anchor':'end',class:'tlab'}),v));}
+    svg.appendChild(txt(el('text',{x:(m.l+W-m.r)/2,y:H-6,'text-anchor':'middle',class:'tlab'}),'Average height (cm)'));
+    svg.appendChild(txt(el('text',{x:14,y:(m.t+H-m.b)/2,'text-anchor':'middle',class:'tlab',transform:`rotate(-90 14 ${(m.t+H-m.b)/2})`}),'Average weight (kg)'));
+    if(!zoomed){const bx=X(core[0][0]),bx2=X(core[0][1]),by=Y(core[1][1]),by2=Y(core[1][0]);
+      const box=el('rect',{x:bx,y:by,width:bx2-bx,height:by2-by,fill:'none',stroke:'#6a4ea3','stroke-width':1.4,'stroke-dasharray':'5 4',rx:6,opacity:.7,cursor:'pointer'});
+      box.addEventListener('click',zoomIn);box.addEventListener('mouseenter',e=>showTip('<b>Core cluster</b><br>12+ overlapping sports<br><span class="k">click to zoom in</span>',e));
+      box.addEventListener('mousemove',moveTip);box.addEventListener('mouseleave',hideTip);svg.appendChild(box);
+      const ht=txt(el('text',{x:(bx+bx2)/2,y:by-6,'text-anchor':'middle',class:'drillhint'}),'click to zoom in ↓');svg.appendChild(ht);animate(1400,t=>ht.setAttribute('opacity',.4+.6*Math.abs(Math.sin(t*6.28))));}
+    d.forEach((s,i)=>{const inView=s[1]>=xr[0]-1&&s[1]<=xr[1]+1&&s[2]>=yr[0]-1&&s[2]<=yr[1]+1;if(!inView)return;
+      const dim=(iso!==null&&iso!==i)||(zone&&s[1]<195);const r=Math.max(5,6+Math.sqrt(s[3])/(zoomed?2.4:3.4));
+      const c=el('circle',{cx:X(s[1]),cy:Y(s[2]),r:r,fill:catCol[s[4]],opacity:dim?.12:.72,stroke:'#fff','stroke-width':1.5,cursor:'pointer'});
+      c.addEventListener('mouseenter',e=>{c.setAttribute('opacity',1);showTip(`<b>${s[0]}</b><br><span class="k">Height:</span> ${s[1]} cm<br><span class="k">Weight:</span> ${s[2]} kg<br><span class="k">Athletes:</span> ${s[3]}<br><span class="k">${catName[s[4]]}</span>`,e);});
+      c.addEventListener('mousemove',moveTip);c.addEventListener('mouseleave',()=>{c.setAttribute('opacity',dim?.12:.72);hideTip();});
+      c.addEventListener('click',ev=>{ev.stopPropagation();iso=(iso===i)?null:i;document.getElementById('rev-body').textContent=iso===i?`${s[0]}: avg ${s[1]} cm, ${s[2]} kg · ${s[3]} athletes (${catName[s[4]]}).`:'';draw();});
+      svg.appendChild(c);if(zoomed||s[3]>280)svg.appendChild(txt(el('text',{x:X(s[1]),y:Y(s[2])-r-3,'text-anchor':'middle',class:'tlab','font-weight':'600',opacity:dim?.2:1}),s[0]));});
+    let lx=m.l;["C","T","X"].forEach(k=>{svg.appendChild(el('circle',{cx:lx+6,cy:m.t+4,r:5,fill:catCol[k]}));svg.appendChild(txt(el('text',{x:lx+16,y:m.t+8,class:'tlab'}),catName[k]));lx+=catName[k].length*6.6+34;});}
+  function zoomIn(){if(zoomed)return;zoomed=true;hideTip();ctl();const from=[full[0].slice(),full[1].slice()];
+    animate(750,t=>{dom=[[lerp(from[0][0],core[0][0],t),lerp(from[0][1],core[0][1],t)],[lerp(from[1][0],core[1][0],t),lerp(from[1][1],core[1][1],t)]];draw();},
+      ()=>{document.getElementById('rev-body').textContent='Zoomed into the core: a dozen sports that overlapped as one blob — wrestling, judo, swimming, athletics — each with distinct height/weight needs the village must plan for.';});}
+  function zoomOut(){zoomed=false;iso=null;hideTip();ctl();const from=[dom[0].slice(),dom[1].slice()];
+    animate(650,t=>{dom=[[lerp(from[0][0],full[0][0],t),lerp(from[0][1],full[0][1],t)],[lerp(from[1][0],full[1][0],t),lerp(from[1][1],full[1][1],t)]];draw();},
+      ()=>{document.getElementById('rev-body').textContent='';});}
+  function ctl(){if(!zoomed)mkBtns(document.getElementById('ctl-body'),[{label:'Toggle ≥195 cm zone',toggle:true,on:zone}],(it,on)=>{zone=on;
+      document.getElementById('rev-body').textContent=on?'Basketball, volleyball, water polo and rowing average ≥185 cm; their tallest members (the 6.4% ≥195 cm — 708 of 11,179 Rio athletes) overflow standard 190 cm dorm beds.':'';draw();});
+    else mkBtns(document.getElementById('ctl-body'),[{label:'← zoom out',act:'out',cls:'back'},{label:'Toggle ≥195 cm zone',toggle:true,on:zone}],(it,on)=>{if(it.act==='out')zoomOut();else{zone=on;draw();}});}
+  draw();ctl();
+})();
+addEventListener('scroll',hideTip,{passive:true});
+</script>
+</body></html>

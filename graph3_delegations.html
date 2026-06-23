@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Delegations (drilldown)</title>
+<style>
+  :root{--ink:#1c2533;--muted:#5c6675;--line:#e3e7ee;--accent:#6a4ea3;--rec-key:#3a8063;--bg:#f4f5f8;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:"Segoe UI",system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif;line-height:1.5;display:flex;justify-content:center}
+  .chart-card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin:24px 16px;max-width:840px;width:100%;box-shadow:0 6px 24px rgba(30,40,60,.06)}
+  .chart-title{font-size:16px;font-weight:700;margin:0 0 2px}
+  .chart-note{font-size:12.5px;color:var(--muted);margin:0 0 10px}
+  .controls{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 12px;align-items:center}
+  .btn{border:1px solid var(--line);background:#fff;color:var(--ink);font:inherit;font-size:12.5px;font-weight:600;padding:6px 13px;border-radius:999px;cursor:pointer;transition:.15s}
+  .btn:hover{border-color:var(--accent);color:var(--accent)}
+  .btn.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .btn.back{border-color:var(--accent);color:var(--accent)}
+  svg{display:block;width:100%;height:auto;overflow:visible;touch-action:none}
+  .tip{position:fixed;pointer-events:none;background:#1c2533;color:#fff;font-size:12.5px;padding:8px 11px;border-radius:9px;opacity:0;transition:opacity .12s;z-index:50;max-width:240px;box-shadow:0 8px 24px rgba(0,0,0,.25);line-height:1.45}
+  .tip .k{color:#9fb4d8}
+  .reveal{font-size:13px;color:var(--rec-key);font-weight:600;margin-top:10px;min-height:18px}
+  .tlab{fill:var(--muted);font-size:11px}.grid{stroke:#eceef3;stroke-width:1}.axis{stroke:#cdd4df;stroke-width:1}
+  .drillhint{fill:var(--accent);font-size:11.5px;font-weight:700}
+</style>
+</head><body>
+<div class="chart-card">
+  <p class="chart-title">NOCs by delegation size, Rio 2016 — click the 1–20 bar to drill in</p>
+  <p class="chart-note">The biggest bar hides the real story. <b>Click it</b> for an animated zoom into those 117 NOCs, then consolidate them into 3 hubs.</p>
+  <div class="controls" id="ctl-del"></div>
+  <svg id="svg-del" viewBox="0 0 760 380" role="img"></svg>
+  <div class="reveal" id="rev-del"></div>
+</div>
+<div class="tip" id="tip"></div>
+<script>
+const SVGNS="http://www.w3.org/2000/svg";const tip=document.getElementById('tip');
+function el(t,a={}){const e=document.createElementNS(SVGNS,t);for(const k in a)e.setAttribute(k,a[k]);return e;}
+function txt(e,s){e.textContent=s;return e;}
+function showTip(html,evt){tip.innerHTML=html;tip.style.opacity=1;moveTip(evt);}
+function moveTip(evt){const x=evt.clientX,y=evt.clientY;tip.style.left=Math.min(x+14,innerWidth-tip.offsetWidth-10)+'px';tip.style.top=(y-10-tip.offsetHeight)+'px';if(y-tip.offsetHeight<10)tip.style.top=(y+18)+'px';}
+function hideTip(){tip.style.opacity=0;}
+function lerp(a,b,t){return a+(b-a)*t;}
+function ease(t){return t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;}
+function animate(dur,cb,done){const s=performance.now();function f(n){let t=Math.min(1,(n-s)/dur);cb(ease(t));if(t<1)requestAnimationFrame(f);else if(done)done();}requestAnimationFrame(f);}
+function mkBtns(host,items,onpick){host.innerHTML='';const btns=[];items.forEach(it=>{const b=document.createElement('button');b.className='btn'+(it.on?' on':'')+(it.cls?' '+it.cls:'');b.textContent=it.label;
+  b.onclick=()=>{if(it.toggle){b.classList.toggle('on');onpick(it,b.classList.contains('on'),btns);}else{if(!it.act){btns.forEach(x=>{if(!x._toggle)x.classList.remove('on')});b.classList.add('on');}onpick(it,true,btns);}};b._toggle=!!it.toggle;host.appendChild(b);btns.push(b);});return btns;}
+
+(function(){
+  const svg=document.getElementById('svg-del'),W=760,H=380;
+  const bars=[["1–20",117,"#d6248f"],["21–50",32,"#2f7ed8"],["51–100",25,"#2f7ed8"],["101–200",16,"#2f7ed8"],["200+",17,"#2f7ed8"]];
+  const m={l:50,r:20,t:30,b:46},ymax=130,bw=(W-m.l-m.r)/bars.length;
+  const X=i=>m.l+i*bw+bw*0.16,Y=v=>H-m.b-v/ymax*(H-m.t-m.b),barW=bw*0.68;
+  const hubs=[{name:"Americas",cx:175,col:"#2f4f86",n:40},{name:"Africa–Europe",cx:380,col:"#3a8063",n:42},{name:"Asia–Pacific",cx:585,col:"#c98a2e",n:35}];
+  const dots=[];hubs.forEach((h,hi)=>{for(let k=0;k<h.n;k++)dots.push({hub:hi,angle:Math.random()*6.28,rad:14+Math.random()*52,sx:60+Math.random()*(W-120),sy:70+Math.random()*(H-200)});});
+  let scene='bars';const gA=el('g'),gB=el('g');
+  function drawBars(){gA.innerHTML='';
+    for(let v=0;v<=120;v+=40){const y=Y(v);gA.appendChild(el('line',{x1:m.l,y1:y,x2:W-m.r,y2:y,class:'grid'}));gA.appendChild(txt(el('text',{x:m.l-8,y:y+4,'text-anchor':'end',class:'tlab'}),v));}
+    gA.appendChild(el('line',{x1:m.l,y1:H-m.b,x2:W-m.r,y2:H-m.b,class:'axis'}));
+    bars.forEach((b,i)=>{const h=H-m.b-Y(b[1]),y=Y(b[1]),first=i===0;
+      const r=el('rect',{x:X(i),y:H-m.b,width:barW,height:0,rx:5,fill:b[2],cursor:first?'pointer':'default',opacity:first?1:.92});
+      gA.appendChild(r);animate(800,t=>{r.setAttribute('y',H-m.b-h*t);r.setAttribute('height',h*t);});
+      gA.appendChild(txt(el('text',{x:X(i)+barW/2,y:y-8,'text-anchor':'middle',class:'tlab','font-weight':'700',fill:'#1c2533','font-size':'13'}),b[1]));
+      gA.appendChild(txt(el('text',{x:X(i)+barW/2,y:H-m.b+18,'text-anchor':'middle',class:'tlab'}),b[0]));
+      if(first){const hint=txt(el('text',{x:X(i)+barW/2,y:y-26,'text-anchor':'middle',class:'drillhint'}),'click to zoom in ↓');gA.appendChild(hint);
+        animate(1400,t=>hint.setAttribute('opacity',.4+.6*Math.abs(Math.sin(t*6.28))));
+        r.addEventListener('mouseenter',e=>{r.setAttribute('opacity',.82);showTip('<b>117 NOCs</b> sent ≤20 athletes<br>788 athletes · ~7% of field<br><span class="k">click to drill in</span>',e);});
+        r.addEventListener('mousemove',moveTip);r.addEventListener('mouseleave',()=>{r.setAttribute('opacity',1);hideTip();});
+        r.addEventListener('click',()=>toDrill(X(i)+barW/2,y+h/2));}});
+    gA.appendChild(txt(el('text',{x:(m.l+W-m.r)/2,y:H-8,'text-anchor':'middle',class:'tlab'}),'Athletes sent per NOC'));}
+  let consolidated=false;
+  function drawHubs(t){gB.innerHTML='';
+    if(t>.15)hubs.forEach(h=>{gB.appendChild(el('circle',{cx:h.cx,cy:185,r:72,fill:h.col,opacity:.07*t}));
+      gB.appendChild(txt(el('text',{x:h.cx,y:292,'text-anchor':'middle',class:'tlab',fill:h.col,'font-weight':'700',opacity:t}),h.name));
+      gB.appendChild(txt(el('text',{x:h.cx,y:308,'text-anchor':'middle',class:'tlab',opacity:t}),h.n+' NOCs · 1 staff pool'));});
+    dots.forEach(o=>{const h=hubs[o.hub];const tx=h.cx+Math.cos(o.angle)*o.rad,ty=185+Math.sin(o.angle)*o.rad;
+      gB.appendChild(el('circle',{cx:lerp(o.sx,tx,t),cy:lerp(o.sy,ty,t),r:4.4,fill:h.col,opacity:lerp(.45,.85,t),stroke:'#fff','stroke-width':1}));});
+    const staff=Math.round(lerp(400,40,t));gB.appendChild(el('rect',{x:W/2-96,y:14,width:192,height:32,rx:9,fill:'#1c2533'}));
+    gB.appendChild(txt(el('text',{x:W/2,y:35,'text-anchor':'middle',fill:'#fff','font-size':'14.5','font-weight':'700'}),'Duplicated staff roles: '+staff));}
+  function setT(g,s,o){g.setAttribute('transform',`translate(${W/2} ${H/2}) scale(${s}) translate(${-W/2} ${-H/2})`);g.setAttribute('opacity',o);}
+  function toDrill(bx,by){hideTip();scene='drill';consolidated=false;ctl();gB.style.display='';drawHubs(0);
+    animate(700,t=>{const s=lerp(1,2.6,t);gA.setAttribute('transform',`translate(${bx} ${by}) scale(${s}) translate(${-bx} ${-by})`);gA.setAttribute('opacity',1-t);setT(gB,lerp(.4,1,t),t);},
+      ()=>{gA.style.display='none';gA.setAttribute('transform','');});}
+  function toBars(){hideTip();scene='bars';ctl();gA.style.display='';drawBars();
+    animate(650,t=>{gA.setAttribute('transform','');gA.setAttribute('opacity',t);setT(gB,lerp(1,.4,t),1-t);},
+      ()=>{gB.style.display='none';gB.setAttribute('transform','');document.getElementById('rev-del').textContent='';});}
+  function ctl(){if(scene==='bars'){mkBtns(document.getElementById('ctl-del'),[{label:'Click the pink 1–20 bar to drill in',act:'noop'}],()=>{});document.querySelector('#ctl-del .btn').style.cursor='default';}
+    else mkBtns(document.getElementById('ctl-del'),[{label:'← back to bars',act:'back',cls:'back'},{label:'Consolidate ▶',act:'go'}],
+      (it)=>{if(it.act==='back')toBars();else if(it.act==='go'&&!consolidated){consolidated=true;animate(1600,drawHubs);
+        document.getElementById('rev-del').textContent='117 small NOCs → 3 shared hubs. Pooling attaché, medical and translation staff cuts ~400 duplicated roles to ~40 (~90% reduction), lowering cost per athlete.';}});}
+  svg.appendChild(gA);svg.appendChild(gB);gB.style.display='none';drawBars();ctl();
+})();
+addEventListener('scroll',hideTip,{passive:true});
+</script>
+</body></html>

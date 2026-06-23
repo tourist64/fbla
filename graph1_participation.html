@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Participation Forecast</title>
+<style>
+  :root{--ink:#1c2533;--muted:#5c6675;--line:#e3e7ee;--accent:#6a4ea3;--rec-key:#3a8063;--bg:#f4f5f8;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:"Segoe UI",system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif;line-height:1.5;display:flex;justify-content:center}
+  .chart-card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin:24px 16px;max-width:840px;width:100%;box-shadow:0 6px 24px rgba(30,40,60,.06)}
+  .chart-title{font-size:16px;font-weight:700;margin:0 0 2px}
+  .chart-note{font-size:12.5px;color:var(--muted);margin:0 0 10px}
+  .controls{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 12px;align-items:center}
+  .btn{border:1px solid var(--line);background:#fff;color:var(--ink);font:inherit;font-size:12.5px;font-weight:600;padding:6px 13px;border-radius:999px;cursor:pointer;transition:.15s}
+  .btn:hover{border-color:var(--accent);color:var(--accent)}
+  .btn.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+  svg{display:block;width:100%;height:auto;overflow:visible;touch-action:none}
+  .tip{position:fixed;pointer-events:none;background:#1c2533;color:#fff;font-size:12.5px;padding:8px 11px;border-radius:9px;opacity:0;transition:opacity .12s;z-index:50;max-width:240px;box-shadow:0 8px 24px rgba(0,0,0,.25);line-height:1.45}
+  .tip .k{color:#9fb4d8}
+  .reveal{font-size:13px;color:var(--rec-key);font-weight:600;margin-top:10px;min-height:18px}
+  .tlab{fill:var(--muted);font-size:11px}.grid{stroke:#eceef3;stroke-width:1}.axis{stroke:#cdd4df;stroke-width:1}
+</style>
+</head><body>
+<div class="chart-card">
+  <p class="chart-title">Total Olympic athletes, 1896–2028 (actual through 2016)</p>
+  <p class="chart-note">Click an era to zoom. Toggle the regression to see the long-run trend and the post-2000 plateau.</p>
+  <div class="controls" id="ctl-part"></div>
+  <svg id="svg-part" viewBox="0 0 760 380" role="img"></svg>
+  <div class="reveal" id="rev-part"></div>
+</div>
+<div class="tip" id="tip"></div>
+<script>
+const SVGNS="http://www.w3.org/2000/svg";const tip=document.getElementById('tip');
+function el(t,a={}){const e=document.createElementNS(SVGNS,t);for(const k in a)e.setAttribute(k,a[k]);return e;}
+function txt(e,s){e.textContent=s;return e;}
+function showTip(html,evt){tip.innerHTML=html;tip.style.opacity=1;moveTip(evt);}
+function moveTip(evt){const x=evt.clientX,y=evt.clientY;tip.style.left=Math.min(x+14,innerWidth-tip.offsetWidth-10)+'px';tip.style.top=(y-10-tip.offsetHeight)+'px';if(y-tip.offsetHeight<10)tip.style.top=(y+18)+'px';}
+function hideTip(){tip.style.opacity=0;}
+function ease(t){return t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;}
+function animate(dur,cb,done){const s=performance.now();function f(n){let t=Math.min(1,(n-s)/dur);cb(ease(t));if(t<1)requestAnimationFrame(f);else if(done)done();}requestAnimationFrame(f);}
+function mkBtns(host,items,onpick){host.innerHTML='';const btns=[];items.forEach(it=>{const b=document.createElement('button');b.className='btn'+(it.on?' on':'');b.textContent=it.label;
+  b.onclick=()=>{if(it.toggle){b.classList.toggle('on');onpick(it,b.classList.contains('on'),btns);}else{btns.forEach(x=>{if(!x._toggle)x.classList.remove('on')});b.classList.add('on');onpick(it,true,btns);}};b._toggle=!!it.toggle;host.appendChild(b);btns.push(b);});return btns;}
+
+(function(){
+  const data=[[1896,241],[1900,997],[1904,651],[1908,2008],[1912,2407],[1920,2626],[1924,3089],
+    [1928,2883],[1932,1332],[1936,3963],[1948,4104],[1952,4955],[1956,3314],[1960,5338],[1964,5151],
+    [1968,5516],[1972,7134],[1976,6084],[1980,5179],[1984,6829],[1988,8391],[1992,9356],[1996,10318],
+    [2000,10651],[2004,10625],[2008,10942],[2012,10768],[2016,11238]];
+  const proj=[2028,11490];const svg=document.getElementById('svg-part'),W=760,H=380,m={l:54,r:18,t:18,b:38};
+  const eras={"All":[1896,2028],"Modern (2000+)":[2000,2028],"Postwar (1948–96)":[1948,1996],"Early (1896–1936)":[1896,1936]};
+  let cur=[1896,2028],showReg=false;
+  const n=data.length,sx=data.reduce((a,d)=>a+d[0],0),sy=data.reduce((a,d)=>a+d[1],0);
+  const sxx=data.reduce((a,d)=>a+d[0]*d[0],0),sxy=data.reduce((a,d)=>a+d[0]*d[1],0);
+  const slope=(n*sxy-sx*sy)/(n*sxx-sx*sx),intc=(sy-slope*sx)/n,reg=x=>slope*x+intc;
+  function draw(){svg.innerHTML='';const[x0,x1]=cur;const all=data.concat([proj]).filter(d=>d[0]>=x0-2&&d[0]<=x1+2);
+    const ymax=Math.max(...all.map(d=>d[1]))*1.12;const X=x=>m.l+(x-x0)/(x1-x0)*(W-m.l-m.r),Y=y=>H-m.b-y/ymax*(H-m.t-m.b);
+    for(let i=0;i<=4;i++){const yv=ymax*i/4,y=Y(yv);svg.appendChild(el('line',{x1:m.l,y1:y,x2:W-m.r,y2:y,class:'grid'}));svg.appendChild(txt(el('text',{x:m.l-8,y:y+4,'text-anchor':'end',class:'tlab'}),Math.round(yv/1000)+'k'));}
+    const span=x1-x0,step=span>80?20:span>40?10:8;
+    for(let yr=Math.ceil(x0/step)*step;yr<=x1;yr+=step)svg.appendChild(txt(el('text',{x:X(yr),y:H-m.b+18,'text-anchor':'middle',class:'tlab'}),yr));
+    svg.appendChild(el('line',{x1:m.l,y1:H-m.b,x2:W-m.r,y2:H-m.b,class:'axis'}));
+    if(showReg){svg.appendChild(el('line',{x1:X(x0),y1:Y(Math.max(0,reg(x0))),x2:X(x1),y2:Y(reg(x1)),stroke:'#c98a2e','stroke-width':2,'stroke-dasharray':'6 5',opacity:.9}));svg.appendChild(txt(el('text',{x:X(x1)-4,y:Y(reg(x1))-8,'text-anchor':'end',class:'tlab',fill:'#c98a2e'}),'trend'));}
+    const pts=data.filter(d=>d[0]>=x0&&d[0]<=x1);
+    const path=el('path',{d:pts.map((d,i)=>(i?'L':'M')+X(d[0])+' '+Y(d[1])).join(' '),fill:'none',stroke:'#3a8063','stroke-width':2.6,'stroke-linejoin':'round'});
+    svg.appendChild(path);if(typeof path.getTotalLength==='function'){const len=path.getTotalLength();path.style.strokeDasharray=len;path.style.strokeDashoffset=len;animate(900,t=>path.style.strokeDashoffset=len*(1-t));}
+    if(x1>=2028){const last=data[data.length-1];svg.appendChild(el('line',{x1:X(last[0]),y1:Y(last[1]),x2:X(proj[0]),y2:Y(proj[1]),stroke:'#e8821e','stroke-width':2.6,'stroke-dasharray':'2 5'}));}
+    pts.concat(x1>=2028?[proj]:[]).forEach(d=>{const isP=d[0]===2028;
+      const c=el('circle',{cx:X(d[0]),cy:Y(d[1]),r:isP?6:3.6,fill:isP?'#e8821e':'#3a8063',stroke:'#fff','stroke-width':1.4,cursor:'pointer'});
+      c.addEventListener('mouseenter',e=>{c.setAttribute('r',isP?9:6.5);showTip(`<b>${d[0]}${isP?' (projected)':''}</b><br><span class="k">Athletes:</span> ${d[1].toLocaleString()}`+(isP?'':`<br><span class="k">Trend:</span> ${Math.round(reg(d[0])).toLocaleString()}`),e);});
+      c.addEventListener('mousemove',moveTip);c.addEventListener('mouseleave',()=>{c.setAttribute('r',isP?6:3.6);hideTip();});svg.appendChild(c);
+      if(isP)svg.appendChild(txt(el('text',{x:X(d[0]),y:Y(d[1])-14,'text-anchor':'middle',class:'tlab',fill:'#e8821e','font-weight':'700'}),'11,490'));});}
+  mkBtns(document.getElementById('ctl-part'),Object.keys(eras).map((k,i)=>({label:k,on:i===0,range:eras[k]})).concat([{label:'Reveal regression',toggle:true}]),
+    (it,on)=>{if(it.toggle){showReg=on;document.getElementById('rev-part').textContent=on?`Trend: +${Math.round(slope)} athletes/yr. Real counts flatten above the trend after 2000 — the plateau that kills the case for building.`:'';}else cur=it.range;draw();});
+  draw();
+})();
+addEventListener('scroll',hideTip,{passive:true});
+</script>
+</body></html>
