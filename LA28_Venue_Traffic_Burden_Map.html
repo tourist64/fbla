@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LA28 Venue Traffic Burden Map</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  :root{
+    --high:#c0392b; --mod:#e08e1b; --low:#2e9e5b;
+    --ink:#1f2433; --muted:#6b7280; --line:#e6e8ee;
+    --panel:#ffffff; --bg:#f4f1e8; --accent:#caa14a; --hub:#5b53c9;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;
+    color:var(--ink); background:var(--bg); overflow:hidden}
+  .app{display:flex; flex-direction:column; height:100vh; padding:16px; gap:12px}
+
+  header{display:flex; align-items:baseline; gap:16px; flex-wrap:wrap; padding:0 4px}
+  header h1{font-size:27px; font-weight:800; letter-spacing:-.5px}
+  header h1 .em{color:var(--accent)}
+  header .sub{font-size:13.5px; color:var(--muted); font-weight:500}
+
+  /* KPI strip */
+  .kpis{display:flex; gap:10px; padding:0 4px}
+  .kpi{background:#fff; border-radius:12px; padding:11px 16px; box-shadow:0 3px 12px rgba(31,36,51,.07);
+    display:flex; flex-direction:column; gap:2px; flex:1}
+  .kpi .n{font-size:23px; font-weight:800; line-height:1}
+  .kpi .l{font-size:11.5px; color:var(--muted); font-weight:600}
+  .kpi.red .n{color:var(--high)}
+
+  .controls{display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:0 4px}
+  .filters{display:flex; gap:7px; flex-wrap:wrap}
+  .fbtn{border:2px solid var(--line); background:#fff; color:var(--ink); font-size:13.5px; font-weight:700;
+    padding:8px 15px; border-radius:30px; cursor:pointer; transition:.15s; display:flex; align-items:center; gap:7px}
+  .fbtn:hover{border-color:var(--accent)}
+  .fbtn .dot{width:10px; height:10px; border-radius:50%}
+  .fbtn[data-f="all"] .dot{background:linear-gradient(135deg,var(--high),var(--mod),var(--low))}
+  .fbtn[data-f="High"] .dot{background:var(--high)}
+  .fbtn[data-f="Moderate"] .dot{background:var(--mod)}
+  .fbtn[data-f="Low"] .dot{background:var(--low)}
+  .fbtn.active{color:#fff; border-color:transparent}
+  .fbtn.active[data-f="all"]{background:var(--ink)}
+  .fbtn.active[data-f="High"]{background:var(--high)}
+  .fbtn.active[data-f="Moderate"]{background:var(--mod)}
+  .fbtn.active[data-f="Low"]{background:var(--low)}
+
+  .pbtn{font-size:14px; font-weight:800; padding:9px 20px; border-radius:30px; cursor:pointer; border:none;
+    color:#fff; display:flex; align-items:center; gap:9px; transition:.15s; box-shadow:0 3px 10px rgba(31,36,51,.18)}
+  .pbtn.play{background:var(--accent)} .pbtn.play:hover{filter:brightness(1.06)}
+  .pbtn.stop{background:var(--high)}
+  .pbtn .ic{font-size:13px}
+  .hubbtn{font-size:13.5px; font-weight:700; padding:8px 15px; border-radius:30px; cursor:pointer;
+    border:2px solid var(--hub); color:var(--hub); background:#fff; display:flex; align-items:center; gap:7px}
+  .hubbtn.on{background:var(--hub); color:#fff}
+  .spacer{margin-left:auto}
+  .formula{font-size:12px; color:var(--muted); font-style:italic}
+
+  .main{display:flex; gap:12px; flex:1; min-height:0}
+  #map{flex:1; border-radius:16px; box-shadow:0 6px 24px rgba(31,36,51,.10); z-index:1}
+
+  .panel{width:368px; flex-shrink:0; background:var(--panel); border-radius:16px;
+    box-shadow:0 6px 24px rgba(31,36,51,.10); padding:20px; display:flex; flex-direction:column; gap:12px; overflow:hidden}
+  .twoup{display:flex; gap:10px}
+  .cell{flex:1; background:var(--bg); border-radius:10px; padding:11px 13px; display:flex; flex-direction:column; gap:3px}
+  .cell .ck{font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.5px}
+  .cell .cv{font-size:17px; font-weight:800}
+  .panel .hint{color:var(--muted); font-size:14px; line-height:1.5}
+  .tourflag{font-size:11px; font-weight:800; letter-spacing:.6px; text-transform:uppercase; color:var(--accent);
+    display:flex; align-items:center; gap:8px}
+  .tourflag .prog{flex:1; height:4px; background:var(--line); border-radius:3px; overflow:hidden}
+  .tourflag .prog i{display:block; height:100%; background:var(--accent); transition:width .4s}
+  .vname{font-size:21px; font-weight:800; line-height:1.2}
+  .vtier{display:inline-flex; align-items:center; gap:7px; font-size:12px; font-weight:800;
+    padding:5px 12px; border-radius:20px; color:#fff; width:fit-content; letter-spacing:.3px}
+  .vtier.High{background:var(--high)} .vtier.Moderate{background:var(--mod)} .vtier.Low{background:var(--low)}
+  .vsport{font-size:13px; color:var(--muted); font-weight:600}
+  .scorebox{background:var(--bg); border-radius:12px; padding:15px; display:flex; justify-content:space-between; align-items:flex-end}
+  .scorebox .lbl{font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.6px}
+  .scorebox .val{font-size:32px; font-weight:800; line-height:1; margin-top:4px}
+  .scorebox .share{text-align:right; font-size:12px; color:var(--muted); font-weight:700}
+  .scorebox .share b{display:block; font-size:19px; color:var(--ink)}
+  .stats{display:flex; flex-direction:column}
+  .row{display:flex; justify-content:space-between; align-items:center; padding:9px 0; border-bottom:1px solid var(--line); font-size:13.5px}
+  .row:last-child{border-bottom:none}
+  .row .k{color:var(--muted); font-weight:600}
+  .row .v{font-weight:700; text-align:right}
+  .barwrap .lbl{font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.6px; margin-bottom:6px}
+  .bar{height:13px; border-radius:8px; background:var(--line); overflow:hidden}
+  .bar > i{display:block; height:100%; border-radius:8px}
+  .rec{background:linear-gradient(135deg,#fbf7ec,#f6efdb); border:1.5px solid #ecdcae; border-radius:12px; padding:14px}
+  .rec .h{font-size:11px; font-weight:800; letter-spacing:.6px; text-transform:uppercase; color:var(--accent);
+    display:flex; align-items:center; gap:7px; margin-bottom:7px}
+  .rec .t{font-size:14px; line-height:1.5; font-weight:600}
+  .rec .hub{margin-top:9px; font-size:12px; font-weight:700; color:var(--hub)}
+
+  .legend{background:#fff; padding:11px 13px; border-radius:12px; box-shadow:0 2px 10px rgba(0,0,0,.15);
+    font-size:12.5px; line-height:1.85; font-weight:600}
+  .legend .li{display:flex; align-items:center; gap:8px}
+  .legend .sw{width:13px; height:13px; border-radius:50%}
+  .legend .title{font-weight:800; font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); margin-bottom:3px}
+
+  .vmarker{border:3px solid #fff; border-radius:50%; box-shadow:0 2px 6px rgba(0,0,0,.35)}
+  .vmarker.active{border-color:var(--ink); box-shadow:0 0 0 4px rgba(31,36,51,.25),0 2px 6px rgba(0,0,0,.4)}
+  .hubmarker{display:flex;align-items:center;justify-content:center;background:var(--hub);color:#fff;
+    border:3px solid #fff;border-radius:11px;font-weight:800;font-size:11px;padding:5px 9px;white-space:nowrap;
+    box-shadow:0 3px 9px rgba(0,0,0,.3)}
+  .leaflet-tooltip.vt{font-weight:700}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>LA28 Venue Traffic <span class="em">Burden</span> on Los Angeles</h1>
+    <span class="sub">Where Games-day crowds strain the city, and how to absorb them</span>
+  </header>
+
+  <div class="kpis">
+    <div class="kpi"><span class="n" id="k-venues">14</span><span class="l">Major venues mapped</span></div>
+    <div class="kpi red"><span class="n" id="k-high">4</span><span class="l">High-burden hot spots</span></div>
+    <div class="kpi red"><span class="n" id="k-share">67%</span><span class="l">of total city burden from those 4</span></div>
+    <div class="kpi"><span class="n" id="k-total">720,758</span><span class="l">Total burden score</span></div>
+  </div>
+
+  <div class="controls">
+    <button class="pbtn play" id="tourBtn"><span class="ic">▶</span><span id="tourLabel">Play tour</span></button>
+    <button class="hubbtn" id="hubBtn"><span>◆</span><span id="hubLabel">Show 3 regional hubs</span></button>
+    <div class="filters">
+      <button class="fbtn active" data-f="all"><span class="dot"></span>All</button>
+      <button class="fbtn" data-f="High"><span class="dot"></span>High</button>
+      <button class="fbtn" data-f="Moderate"><span class="dot"></span>Moderate</button>
+      <button class="fbtn" data-f="Low"><span class="dot"></span>Low</button>
+    </div>
+    <span class="spacer formula">Burden = Capacity × (2 − Transit/5) × Congestion</span>
+  </div>
+
+  <div class="main">
+    <div id="map"></div>
+    <aside class="panel" id="panel">
+      <div class="vname">Press “Play tour” to begin</div>
+      <p class="hint">The tour auto-flies to the four high-burden venues worst-first and reads out each one: its burden score, share of the city total, and the specific mobility fix. Or click any marker, filter by tier, or toggle the three regional consolidation hubs.</p>
+    </aside>
+  </div>
+</div>
+
+<script>
+const P = {"venues": [{"name": "Rose Bowl", "lat": 34.1613, "lng": -118.1676, "capacity": 89702, "transit": 2, "transit_label": "Poor", "area": "Pasadena (Suburban)", "congestion": 1.1, "sport": "Soccer finals", "score": 157876, "tier": "High", "fix": "No rail within 3 mi. Mandatory park-and-ride from 4 satellite lots with Gold Line shuttle connectors; ban on-site general parking on finals days.", "hub": "North"}, {"name": "SoFi Stadium", "lat": 33.9535, "lng": -118.3392, "capacity": 70240, "transit": 2, "transit_label": "Poor", "area": "Inglewood", "congestion": 1.05, "sport": "Ceremonies, Swimming", "score": 118003, "tier": "High", "fix": "Inglewood Transit Connector people-mover links to K Line. Schedule swimming finals off-peak from ceremonies and meter rideshare via timed-entry pods.", "hub": "South"}, {"name": "Dodger Stadium", "lat": 34.0739, "lng": -118.24, "capacity": 56000, "transit": 2, "transit_label": "Poor", "area": "Central LA (hilltop)", "congestion": 1.2, "sport": "Baseball", "score": 107520, "tier": "High", "fix": "Single-access hilltop site. Expand the existing Dodger Stadium Express from Union Station to 90-second headways and close the ravine to private vehicles.", "hub": "Central"}, {"name": "LA Memorial Coliseum", "lat": 34.0141, "lng": -118.2879, "capacity": 60000, "transit": 3, "transit_label": "Moderate", "area": "Exposition Park / Central LA", "congestion": 1.15, "sport": "Athletics, Ceremonies", "score": 96600, "tier": "High", "fix": "Expo Line already serves the venue. Stagger ceremony egress in 3 timed waves and run dedicated bus bridges to Union Station to cut the post-event surge.", "hub": "Central"}, {"name": "Dignity Health Sports Park", "lat": 33.8644, "lng": -118.2611, "capacity": 27000, "transit": 2, "transit_label": "Poor", "area": "Carson (Suburban)", "congestion": 1.0, "sport": "Rugby sevens", "score": 43200, "tier": "Moderate", "fix": "On CSU Dominguez Hills campus. Use campus lots for park-and-ride and a shuttle to the nearest Metro J Line station.", "hub": "South"}, {"name": "BMO Stadium", "lat": 34.0128, "lng": -118.2848, "capacity": 22000, "transit": 3, "transit_label": "Moderate", "area": "Exposition Park / Central LA", "congestion": 1.15, "sport": "Flag football, Lacrosse", "score": 35420, "tier": "Moderate", "fix": "Inside Expo Park transit-rich core. Fold into a unified Exposition Park entry/egress plan shared with Coliseum and Galen Center.", "hub": "Central"}, {"name": "Intuit Dome", "lat": 33.945, "lng": -118.3417, "capacity": 18300, "transit": 2, "transit_label": "Poor", "area": "Inglewood", "congestion": 1.05, "sport": "Basketball", "score": 30744, "tier": "Moderate", "fix": "Co-located with SoFi. Share the Inglewood Transit Connector and coordinate session start times so the two venues never empty simultaneously.", "hub": "South"}, {"name": "Honda Center", "lat": 33.8078, "lng": -117.8766, "capacity": 18609, "transit": 2, "transit_label": "Poor", "area": "Anaheim (Suburban)", "congestion": 1.0, "sport": "Volleyball", "score": 29774, "tier": "Low", "fix": "ARTIC rail hub is 0.5 mi away but underused. Run continuous ARTIC shuttle and leverage ample existing stadium-district parking.", "hub": "South"}, {"name": "Crypto.com Arena", "lat": 34.043, "lng": -118.2673, "capacity": 18145, "transit": 5, "transit_label": "Excellent", "area": "Downtown LA", "congestion": 1.25, "sport": "Gymnastics, Boxing", "score": 22681, "tier": "Low", "fix": "Best-served venue in the Games (7th & Metro hub). No new infrastructure needed; promote rail as primary access and keep curb space transit-only.", "hub": "Central"}, {"name": "Long Beach Arena", "lat": 33.7649, "lng": -118.1895, "capacity": 14000, "transit": 2, "transit_label": "Poor", "area": "Long Beach Waterfront", "congestion": 1.0, "sport": "Handball", "score": 22400, "tier": "Low", "fix": "Walkable waterfront cluster. Use the Long Beach Transit free shuttle loop and Blue (A) Line to absorb the modest crowd.", "hub": "South"}, {"name": "Long Beach Marine Stadium", "lat": 33.7565, "lng": -118.118, "capacity": 14000, "transit": 2, "transit_label": "Poor", "area": "Long Beach Waterfront", "congestion": 1.0, "sport": "Rowing", "score": 22400, "tier": "Low", "fix": "Constrained waterfront roads. Park-and-ride from CSULB lots with shuttle; restrict event-day access to the peninsula.", "hub": "South"}, {"name": "Galen Center (USC)", "lat": 34.022, "lng": -118.287, "capacity": 10258, "transit": 3, "transit_label": "Moderate", "area": "Exposition Park / Central LA", "congestion": 1.15, "sport": "Badminton", "score": 16515, "tier": "Low", "fix": "On USC campus inside Expo Park. Pedestrianize campus roads during sessions and channel arrivals through Expo/Vermont station.", "hub": "Central"}, {"name": "Peacock Theater", "lat": 34.0445, "lng": -118.2675, "capacity": 7100, "transit": 5, "transit_label": "Excellent", "area": "Downtown LA", "congestion": 1.25, "sport": "Boxing prelims", "score": 8875, "tier": "Low", "fix": "Adjacent to Crypto.com on the same rail hub. Combine ticketing and wayfinding with the DTLA cluster; minimal standalone demand.", "hub": "Central"}, {"name": "LA Convention Center", "lat": 34.0403, "lng": -118.2696, "capacity": 7000, "transit": 5, "transit_label": "Excellent", "area": "Downtown LA", "congestion": 1.25, "sport": "Fencing, Combat sports", "score": 8750, "tier": "Low", "fix": "Pico Station on the doorstep. Route all combat-sport spectators through the unified DTLA rail plan; congestion is foot-traffic, not vehicle.", "hub": "Central"}], "hubs": [{"name": "Central Hub: Union Station Mobility Spine", "lat": 34.056, "lng": -118.235, "desc": "Anchors all Central LA venues (Coliseum, Dodger, DTLA cluster, Expo Park) on the existing Union Station rail core. One shared shuttle backbone replaces venue-by-venue car traffic.", "serves": ["LA Memorial Coliseum", "Dodger Stadium", "Crypto.com Arena", "Peacock Theater", "LA Convention Center", "BMO Stadium", "Galen Center (USC)"]}, {"name": "South Hub: Inglewood\u2013South Bay Connector", "lat": 33.918, "lng": -118.33, "desc": "Consolidates the Inglewood, Carson, and Long Beach venues onto the K Line and Inglewood Transit Connector, coordinating SoFi and Intuit Dome egress so they never overlap.", "serves": ["SoFi Stadium", "Intuit Dome", "Dignity Health Sports Park", "Long Beach Arena", "Long Beach Marine Stadium", "Honda Center"]}, {"name": "North Hub: Pasadena Park-and-Ride Ring", "lat": 34.147, "lng": -118.145, "desc": "Surrounds the transit-poor Rose Bowl with a ring of satellite park-and-ride lots feeding Gold (A) Line shuttles, removing private vehicles from the arroyo entirely.", "serves": ["Rose Bowl"]}], "stats": {"total": 720758, "highCount": 4, "highShare": 67, "maxScore": 157876}};
+const VENUES = P.venues, HUBS = P.hubs, S = P.stats;
+const COLORS = {High:'#c0392b', Moderate:'#e08e1b', Low:'#2e9e5b'};
+const maxScore = S.maxScore;
+
+document.getElementById('k-venues').textContent = VENUES.length;
+document.getElementById('k-high').textContent = S.highCount;
+document.getElementById('k-share').textContent = S.highShare+'%';
+document.getElementById('k-total').textContent = S.total.toLocaleString('en-US');
+
+const map = L.map('map',{zoomControl:true, scrollWheelZoom:true}).setView([33.97,-118.20], 11);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{
+  attribution:'&copy; OpenStreetMap &copy; CARTO', maxZoom:19}).addTo(map);
+
+const radiusFor = s => 12 + (s/maxScore)*22;
+const fmt = n => n.toLocaleString('en-US');
+
+const markers = {};
+VENUES.forEach(v=>{
+  const r = radiusFor(v.score);
+  const icon = L.divIcon({className:'',
+    html:`<div class="vmarker" data-name="${v.name}" style="width:${r*2}px;height:${r*2}px;background:${COLORS[v.tier]}"></div>`,
+    iconSize:[r*2,r*2], iconAnchor:[r,r]});
+  const m = L.marker([v.lat,v.lng],{icon}).addTo(map);
+  m.bindTooltip(v.name,{direction:'top',offset:[0,-r],className:'vt'});
+  m.on('click',()=>{ stopTour(); selectVenue(v); });
+  m._venue=v; markers[v.name]=m;
+});
+
+// Hub layer
+const hubLayer = L.layerGroup();
+HUBS.forEach(h=>{
+  const ic = L.divIcon({className:'', html:`<div class="hubmarker">◆ ${h.name.split(':')[0]}</div>`, iconSize:[1,1]});
+  L.marker([h.lat,h.lng],{icon:ic}).addTo(hubLayer);
+  h.serves.forEach(s=>{
+    const v = VENUES.find(x=>x.name===s);
+    if(v) L.polyline([[h.lat,h.lng],[v.lat,v.lng]],{color:'#5b53c9',weight:2,opacity:.5,dashArray:'5,6'}).addTo(hubLayer);
+  });
+});
+let hubsOn=false;
+document.getElementById('hubBtn').addEventListener('click',function(){
+  hubsOn=!hubsOn; this.classList.toggle('on',hubsOn);
+  document.getElementById('hubLabel').textContent = hubsOn ? 'Hide 3 regional hubs' : 'Show 3 regional hubs';
+  if(hubsOn) hubLayer.addTo(map); else map.removeLayer(hubLayer);
+});
+
+// Legend
+const legend = L.control({position:'bottomright'});
+legend.onAdd=()=>{ const d=L.DomUtil.create('div','legend');
+  d.innerHTML=`<div class="title">Traffic Burden</div>
+    <div class="li"><span class="sw" style="background:${COLORS.High}"></span>High (≥ 80K)</div>
+    <div class="li"><span class="sw" style="background:${COLORS.Moderate}"></span>Moderate (30–80K)</div>
+    <div class="li"><span class="sw" style="background:${COLORS.Low}"></span>Low (&lt; 30K)</div>
+    <div class="li" style="margin-top:5px"><span class="sw" style="background:#5b53c9;border-radius:3px"></span>Regional hub</div>
+    <div style="margin-top:5px;font-size:11px;color:#999;font-weight:600">Circle size ∝ burden score</div>`;
+  return d; };
+legend.addTo(map);
+
+function setActiveMarker(name){
+  document.querySelectorAll('.vmarker').forEach(el=>el.classList.toggle('active', el.dataset.name===name));
+}
+
+function selectVenue(v, tour){
+  setActiveMarker(v.name);
+  map.flyTo([v.lat,v.lng], v.tier==='High'?13:13.5, {duration:1.1});
+  const rank = VENUES.findIndex(x=>x.name===v.name)+1;
+  const pct = Math.round(v.score/maxScore*100);
+  const share = (v.score/S.total*100).toFixed(1);
+  const hub = HUBS.find(h=>h.serves.includes(v.name));
+  document.getElementById('panel').innerHTML = `
+    ${tour?`<div class="tourflag">Auto-tour ${tour.i}/${tour.n}<span class="prog"><i style="width:${tour.i/tour.n*100}%"></i></span></div>`:''}
+    <div class="vname">${v.name}</div>
+    <span class="vtier ${v.tier}">${v.tier.toUpperCase()} BURDEN · #${rank} of ${VENUES.length}</span>
+    <div class="scorebox">
+      <div><div class="lbl">Burden Score</div><div class="val" style="color:${COLORS[v.tier]}">${fmt(v.score)}</div></div>
+      <div class="share">of city total<b>${share}%</b></div>
+    </div>
+    <div class="twoup">
+      <div class="cell"><span class="ck">Capacity</span><span class="cv">${fmt(v.capacity)}</span></div>
+      <div class="cell"><span class="ck">Transit</span><span class="cv">${v.transit_label}</span></div>
+    </div>
+    <div class="rec">
+      <div class="h">◆ Recommended mobility fix</div>
+      <div class="t">${v.fix}</div>
+      ${hub?`<div class="hub">↳ Folds into ${hub.name.split(':')[0]}</div>`:''}
+    </div>`;
+}
+
+// ---- Auto tour: high-burden venues worst-first ----
+const TOUR = VENUES.filter(v=>v.tier==='High'); // already sorted worst-first
+let tourTimer=null, tourIdx=0, touring=false;
+const tourBtn=document.getElementById('tourBtn'), tourLabel=document.getElementById('tourLabel');
+
+function stepTour(){
+  if(tourIdx>=TOUR.length){ // finish on overview
+    map.flyToBounds(L.featureGroup(TOUR.map(v=>markers[v.name])).getBounds().pad(0.3),{duration:1.2});
+    showTourSummary();
+    stopTour(true);
+    return;
+  }
+  const v=TOUR[tourIdx];
+  selectVenue(v,{i:tourIdx+1,n:TOUR.length});
+  tourIdx++;
+  tourTimer=setTimeout(stepTour, 6500);
+}
+function startTour(){
+  touring=true; tourIdx=0;
+  if(hubsOn){ } // keep hubs if user enabled
+  tourBtn.classList.replace('play','stop'); tourBtn.querySelector('.ic').textContent='■'; tourLabel.textContent='Stop tour';
+  stepTour();
+}
+function stopTour(finished){
+  touring=false; clearTimeout(tourTimer);
+  tourBtn.classList.replace('stop','play'); tourBtn.querySelector('.ic').textContent='▶';
+  tourLabel.textContent = finished?'Replay tour':'Play tour';
+  if(!finished) setActiveMarker(null);
+}
+tourBtn.addEventListener('click',()=> touring?stopTour():startTour());
+
+function showTourSummary(){
+  setActiveMarker(null);
+  document.getElementById('panel').innerHTML=`
+    <div class="tourflag">Tour complete<span class="prog"><i style="width:100%"></i></span></div>
+    <div class="vname">The takeaway</div>
+    <div class="scorebox">
+      <div><div class="lbl">High-burden venues</div><div class="val" style="color:var(--high)">${S.highCount}</div></div>
+      <div class="share">drive<b>${S.highShare}%</b>of city burden</div>
+    </div>
+    <p class="hint" style="font-size:14px;color:var(--ink);line-height:1.5;font-weight:500">
+      Four venues, Rose Bowl, SoFi, Dodger, and the Coliseum, generate two-thirds of LA's Games-day traffic load, all from poor rail access despite huge crowds. Downtown venues stay green: same congestion, but rail absorbs it.</p>
+    <div class="rec">
+      <div class="h">◆ What this means for the city</div>
+      <div class="t">Don't spread mobility investment evenly across 14 venues. Concentrate it on the four red hot spots, routed through <b>three regional consolidation hubs</b>.</div>
+      <div class="hub">↳ Toggle “Show 3 regional hubs” to see the plan</div>
+    </div>`;
+}
+
+// Filters
+document.querySelectorAll('.fbtn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    stopTour();
+    document.querySelectorAll('.fbtn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    const f=btn.dataset.f; const show=[];
+    VENUES.forEach(v=>{
+      const m=markers[v.name];
+      if(f==='all'||v.tier===f){ m.addTo(map); show.push(m);} else map.removeLayer(m);
+    });
+    if(show.length) map.fitBounds(L.featureGroup(show).getBounds().pad(0.25));
+  });
+});
+</script>
+</body>
+</html>
