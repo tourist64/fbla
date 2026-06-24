@@ -1,90 +1,502 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8">
+<html lang="en">
+<head>
+<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Body Diversity (drilldown)</title>
+<title>Body Diversity — Rio 2016</title>
 <style>
-  :root{--ink:#1c2533;--muted:#5c6675;--line:#e3e7ee;--accent:#6a4ea3;--rec-key:#3a8063;--bg:#f4f5f8;}
-  *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--ink);font-family:"Segoe UI",system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif;line-height:1.5;display:flex;justify-content:center}
-  .chart-card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin:24px 16px;max-width:840px;width:100%;box-shadow:0 6px 24px rgba(30,40,60,.06)}
-  .chart-title{font-size:16px;font-weight:700;margin:0 0 2px}
-  .chart-note{font-size:12.5px;color:var(--muted);margin:0 0 10px}
-  .controls{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 12px;align-items:center}
-  .btn{border:1px solid var(--line);background:#fff;color:var(--ink);font:inherit;font-size:12.5px;font-weight:600;padding:6px 13px;border-radius:999px;cursor:pointer;transition:.15s}
-  .btn:hover{border-color:var(--accent);color:var(--accent)}
-  .btn.on{background:var(--accent);color:#fff;border-color:var(--accent)}
-  .btn.back{border-color:var(--accent);color:var(--accent)}
-  svg{display:block;width:100%;height:auto;overflow:visible;touch-action:none}
-  .tip{position:fixed;pointer-events:none;background:#1c2533;color:#fff;font-size:12.5px;padding:8px 11px;border-radius:9px;opacity:0;transition:opacity .12s;z-index:50;max-width:240px;box-shadow:0 8px 24px rgba(0,0,0,.25);line-height:1.45}
-  .tip .k{color:#9fb4d8}
-  .reveal{font-size:13px;color:var(--rec-key);font-weight:600;margin-top:10px;min-height:18px}
-  .tlab{fill:var(--muted);font-size:11px}.grid{stroke:#eceef3;stroke-width:1}.axis{stroke:#cdd4df;stroke-width:1}
-  .drillhint{fill:var(--accent);font-size:11.5px;font-weight:700}
+  :root {
+    --ink: #1c2533; --muted: #5c6675; --line: #e3e7ee;
+    --accent: #6a4ea3; --bg: #f4f5f8;
+    --C: #d6248f; --T: #2f7ed8; --X: #e8821e;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 1440px; height: 880px; overflow: hidden;
+    background: var(--bg); color: var(--ink);
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    line-height: 1.5; display: flex; justify-content: center; align-items: center;
+  }
+  .chart-card {
+    background: #fff; border: 1px solid var(--line); border-radius: 14px;
+    padding: 22px 26px 18px; width: 1390px; height: 848px;
+    box-shadow: 0 6px 24px rgba(30,40,60,.06);
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .chart-title { font-size: 19px; font-weight: 700; }
+  .chart-note { font-size: 13px; color: var(--muted); margin-top: 2px; }
+  .controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .btn {
+    border: 1.5px solid var(--line); background: #fff; color: var(--ink);
+    font: inherit; font-size: 13px; font-weight: 600;
+    padding: 5px 14px; border-radius: 999px; cursor: pointer; transition: .15s;
+  }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .btn.back { border-color: var(--accent); color: var(--accent); }
+  .btn.cat-C.on { background: var(--C); border-color: var(--C); color: #fff; }
+  .btn.cat-T.on { background: var(--T); border-color: var(--T); color: #fff; }
+  .btn.cat-X.on { background: var(--X); border-color: var(--X); color: #fff; }
+  .main-area { flex: 1; min-height: 0; display: flex; gap: 14px; }
+  .svg-wrap { flex: 1; min-width: 0; }
+  svg { display: block; width: 100%; height: 100%; }
+  /* Side panel */
+  .side-panel {
+    width: 264px; flex-shrink: 0;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .panel-box {
+    background: #f8f9fc; border: 1px solid var(--line);
+    border-radius: 10px; padding: 12px 14px; font-size: 13px;
+  }
+  .panel-box h3 {
+    font-size: 11px; font-weight: 700; color: var(--muted);
+    text-transform: uppercase; letter-spacing: .05em; margin-bottom: 9px;
+  }
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .stat-item { text-align: center; }
+  .stat-val { font-size: 22px; font-weight: 700; color: var(--ink); }
+  .stat-lbl { font-size: 11px; color: var(--muted); }
+  .metric-row { display: flex; gap: 5px; margin-bottom: 8px; align-items: center; }
+  .metric-lbl { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing:.04em; margin-right: 2px; }
+  .mbtn {
+    border: 1px solid var(--line); background: #fff; color: var(--muted);
+    font: inherit; font-size: 11px; font-weight: 600;
+    padding: 2px 9px; border-radius: 999px; cursor: pointer; transition: .12s;
+  }
+  .mbtn:hover { border-color: var(--accent); color: var(--accent); }
+  .mbtn.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .rank-list { display: flex; flex-direction: column; gap: 2px; overflow-y: auto; }
+  .rank-row {
+    display: flex; align-items: center; gap: 7px; padding: 4px 7px;
+    border-radius: 6px; cursor: pointer; transition: background .1s;
+  }
+  .rank-row:hover { background: #eef0f6; }
+  .rank-row.active { background: #ede9f8; }
+  .rank-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .rank-name { flex: 1; font-weight: 600; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rank-bar-wrap { width: 60px; height: 5px; background: #e3e7ee; border-radius: 3px; overflow: hidden; flex-shrink: 0; }
+  .rank-bar { height: 100%; border-radius: 3px; transition: width .3s; }
+  .rank-val { font-size: 11.5px; color: var(--muted); width: 34px; text-align: right; flex-shrink: 0; }
+  .bmi-legend { display: flex; flex-direction: column; gap: 5px; }
+  .bmi-row { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ink); }
+  .bmi-swatch { width: 22px; height: 12px; border-radius: 3px; flex-shrink: 0; border: 1px solid rgba(0,0,0,.06); }
+  .tip {
+    position: fixed; pointer-events: none; background: #1c2533; color: #fff;
+    font-size: 13px; padding: 9px 12px; border-radius: 9px; opacity: 0;
+    transition: opacity .12s; z-index: 50; max-width: 230px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.25); line-height: 1.5;
+  }
+  .tip .k { color: #9fb4d8; }
+  .tlab { fill: #5c6675; font-size: 12px; }
+  .axlbl { fill: #5c6675; font-size: 12px; font-weight: 600; }
+  .reveal { font-size: 13px; color: #3a8063; font-weight: 600; min-height: 18px; }
 </style>
-</head><body>
+</head>
+<body>
 <div class="chart-card">
-  <p class="chart-title">Average height vs weight by sport, Rio 2016 — click the cluster to zoom in</p>
-  <p class="chart-note">The crowded center hides a dozen overlapping sports. <b>Click into the core cluster</b> for an animated zoom that separates them; toggle the ≥195 cm bed-overflow zone.</p>
+  <div>
+    <p class="chart-title">Average height vs weight by sport — Rio 2016</p>
+    <p class="chart-note">Bubble size = athlete count &nbsp;·&nbsp; BMI bands show lean / athletic / powerful zones &nbsp;·&nbsp; Click any bubble or row to highlight; filter by category</p>
+  </div>
   <div class="controls" id="ctl-body"></div>
-  <svg id="svg-body" viewBox="0 0 760 400" role="img"></svg>
+  <div class="main-area">
+    <div class="svg-wrap"><svg id="svg-body"></svg></div>
+    <div class="side-panel" id="side-panel"></div>
+  </div>
   <div class="reveal" id="rev-body"></div>
 </div>
 <div class="tip" id="tip"></div>
 <script>
-const SVGNS="http://www.w3.org/2000/svg";const tip=document.getElementById('tip');
-function el(t,a={}){const e=document.createElementNS(SVGNS,t);for(const k in a)e.setAttribute(k,a[k]);return e;}
-function txt(e,s){e.textContent=s;return e;}
-function showTip(html,evt){tip.innerHTML=html;tip.style.opacity=1;moveTip(evt);}
-function moveTip(evt){const x=evt.clientX,y=evt.clientY;tip.style.left=Math.min(x+14,innerWidth-tip.offsetWidth-10)+'px';tip.style.top=(y-10-tip.offsetHeight)+'px';if(y-tip.offsetHeight<10)tip.style.top=(y+18)+'px';}
-function hideTip(){tip.style.opacity=0;}
-function lerp(a,b,t){return a+(b-a)*t;}
-function ease(t){return t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;}
-function animate(dur,cb,done){const s=performance.now();function f(n){let t=Math.min(1,(n-s)/dur);cb(ease(t));if(t<1)requestAnimationFrame(f);else if(done)done();}requestAnimationFrame(f);}
-function mkBtns(host,items,onpick){host.innerHTML='';const btns=[];items.forEach(it=>{const b=document.createElement('button');b.className='btn'+(it.on?' on':'')+(it.cls?' '+it.cls:'');b.textContent=it.label;
-  b.onclick=()=>{if(it.toggle){b.classList.toggle('on');onpick(it,b.classList.contains('on'),btns);}else{if(!it.act){btns.forEach(x=>{if(!x._toggle)x.classList.remove('on')});b.classList.add('on');}onpick(it,true,btns);}};b._toggle=!!it.toggle;host.appendChild(b);btns.push(b);});return btns;}
+const SVGNS = "http://www.w3.org/2000/svg";
+const tip = document.getElementById('tip');
 
-(function(){
-  const d=[["Gymnastics",162,56,324,"C"],["Diving",167,60,140,"C"],["Weightlifting",167,80,260,"C"],
-    ["Basketball",192,88,288,"T"],["Volleyball",190,80,288,"T"],["Water Polo",186,85,338,"T"],["Rowing",185,82,550,"T"],["Handball",186,84,336,"T"],
-    ["Athletics",176,69,2300,"X"],["Swimming",180,73,900,"X"],["Football",178,73,500,"X"],["Cycling",177,69,520,"X"],
-    ["Boxing",174,69,286,"X"],["Judo",174,78,386,"X"],["Wrestling",173,79,344,"X"],["Fencing",177,71,210,"X"],
-    ["Hockey",175,70,400,"X"],["Shooting",175,76,390,"X"],["Triathlon",176,64,110,"X"],["Canoe",179,77,330,"X"]];
-  const catCol={C:"#d6248f",T:"#2f7ed8",X:"#e8821e"},catName={C:"Compact builds",T:"Tall & powerful",X:"Typical core"};
-  const svg=document.getElementById('svg-body'),W=760,H=400,m={l:54,r:18,t:18,b:46};
-  const full=[[158,196],[48,95]],core=[[170,182],[62,84]];
-  let dom=[full[0].slice(),full[1].slice()],zoomed=false,iso=null,zone=false;
-  function draw(){svg.innerHTML='';const xr=dom[0],yr=dom[1];
-    const X=x=>m.l+(x-xr[0])/(xr[1]-xr[0])*(W-m.l-m.r),Y=y=>H-m.b-(y-yr[0])/(yr[1]-yr[0])*(H-m.t-m.b);
-    if(zone&&195<=xr[1]){svg.appendChild(el('rect',{x:X(Math.max(195,xr[0])),y:m.t,width:W-m.r-X(Math.max(195,xr[0])),height:H-m.b-m.t,fill:'#6a4ea3',opacity:.08}));
-      svg.appendChild(txt(el('text',{x:X(Math.max(195,xr[0]))+6,y:m.t+16,class:'tlab',fill:'#6a4ea3','font-weight':'700'}),'≥195 cm · overflows a 190 cm bed'));}
-    const xs=Math.ceil(xr[0]/5)*5;for(let v=xs;v<=xr[1];v+=5){const x=X(v);svg.appendChild(el('line',{x1:x,y1:m.t,x2:x,y2:H-m.b,class:'grid'}));svg.appendChild(txt(el('text',{x,y:H-m.b+18,'text-anchor':'middle',class:'tlab'}),v));}
-    const ys=Math.ceil(yr[0]/5)*5;for(let v=ys;v<=yr[1];v+=5){const y=Y(v);svg.appendChild(el('line',{x1:m.l,y1:y,x2:W-m.r,y2:y,class:'grid'}));svg.appendChild(txt(el('text',{x:m.l-8,y:y+4,'text-anchor':'end',class:'tlab'}),v));}
-    svg.appendChild(txt(el('text',{x:(m.l+W-m.r)/2,y:H-6,'text-anchor':'middle',class:'tlab'}),'Average height (cm)'));
-    svg.appendChild(txt(el('text',{x:14,y:(m.t+H-m.b)/2,'text-anchor':'middle',class:'tlab',transform:`rotate(-90 14 ${(m.t+H-m.b)/2})`}),'Average weight (kg)'));
-    if(!zoomed){const bx=X(core[0][0]),bx2=X(core[0][1]),by=Y(core[1][1]),by2=Y(core[1][0]);
-      const box=el('rect',{x:bx,y:by,width:bx2-bx,height:by2-by,fill:'none',stroke:'#6a4ea3','stroke-width':1.4,'stroke-dasharray':'5 4',rx:6,opacity:.7,cursor:'pointer'});
-      box.addEventListener('click',zoomIn);box.addEventListener('mouseenter',e=>showTip('<b>Core cluster</b><br>12+ overlapping sports<br><span class="k">click to zoom in</span>',e));
-      box.addEventListener('mousemove',moveTip);box.addEventListener('mouseleave',hideTip);svg.appendChild(box);
-      const ht=txt(el('text',{x:(bx+bx2)/2,y:by-6,'text-anchor':'middle',class:'drillhint'}),'click to zoom in ↓');svg.appendChild(ht);animate(1400,t=>ht.setAttribute('opacity',.4+.6*Math.abs(Math.sin(t*6.28))));}
-    d.forEach((s,i)=>{const inView=s[1]>=xr[0]-1&&s[1]<=xr[1]+1&&s[2]>=yr[0]-1&&s[2]<=yr[1]+1;if(!inView)return;
-      const dim=(iso!==null&&iso!==i)||(zone&&s[1]<195);const r=Math.max(5,6+Math.sqrt(s[3])/(zoomed?2.4:3.4));
-      const c=el('circle',{cx:X(s[1]),cy:Y(s[2]),r:r,fill:catCol[s[4]],opacity:dim?.12:.72,stroke:'#fff','stroke-width':1.5,cursor:'pointer'});
-      c.addEventListener('mouseenter',e=>{c.setAttribute('opacity',1);showTip(`<b>${s[0]}</b><br><span class="k">Height:</span> ${s[1]} cm<br><span class="k">Weight:</span> ${s[2]} kg<br><span class="k">Athletes:</span> ${s[3]}<br><span class="k">${catName[s[4]]}</span>`,e);});
-      c.addEventListener('mousemove',moveTip);c.addEventListener('mouseleave',()=>{c.setAttribute('opacity',dim?.12:.72);hideTip();});
-      c.addEventListener('click',ev=>{ev.stopPropagation();iso=(iso===i)?null:i;document.getElementById('rev-body').textContent=iso===i?`${s[0]}: avg ${s[1]} cm, ${s[2]} kg · ${s[3]} athletes (${catName[s[4]]}).`:'';draw();});
-      svg.appendChild(c);if(zoomed||s[3]>280)svg.appendChild(txt(el('text',{x:X(s[1]),y:Y(s[2])-r-3,'text-anchor':'middle',class:'tlab','font-weight':'600',opacity:dim?.2:1}),s[0]));});
-    let lx=m.l;["C","T","X"].forEach(k=>{svg.appendChild(el('circle',{cx:lx+6,cy:m.t+4,r:5,fill:catCol[k]}));svg.appendChild(txt(el('text',{x:lx+16,y:m.t+8,class:'tlab'}),catName[k]));lx+=catName[k].length*6.6+34;});}
-  function zoomIn(){if(zoomed)return;zoomed=true;hideTip();ctl();const from=[full[0].slice(),full[1].slice()];
-    animate(750,t=>{dom=[[lerp(from[0][0],core[0][0],t),lerp(from[0][1],core[0][1],t)],[lerp(from[1][0],core[1][0],t),lerp(from[1][1],core[1][1],t)]];draw();},
-      ()=>{document.getElementById('rev-body').textContent='Zoomed into the core: a dozen sports that overlapped as one blob — wrestling, judo, swimming, athletics — each with distinct height/weight needs the village must plan for.';});}
-  function zoomOut(){zoomed=false;iso=null;hideTip();ctl();const from=[dom[0].slice(),dom[1].slice()];
-    animate(650,t=>{dom=[[lerp(from[0][0],full[0][0],t),lerp(from[0][1],full[0][1],t)],[lerp(from[1][0],full[1][0],t),lerp(from[1][1],full[1][1],t)]];draw();},
-      ()=>{document.getElementById('rev-body').textContent='';});}
-  function ctl(){if(!zoomed)mkBtns(document.getElementById('ctl-body'),[{label:'Toggle ≥195 cm zone',toggle:true,on:zone}],(it,on)=>{zone=on;
-      document.getElementById('rev-body').textContent=on?'Basketball, volleyball, water polo and rowing average ≥185 cm; their tallest members (the 6.4% ≥195 cm — 708 of 11,179 Rio athletes) overflow standard 190 cm dorm beds.':'';draw();});
-    else mkBtns(document.getElementById('ctl-body'),[{label:'← zoom out',act:'out',cls:'back'},{label:'Toggle ≥195 cm zone',toggle:true,on:zone}],(it,on)=>{if(it.act==='out')zoomOut();else{zone=on;draw();}});}
-  draw();ctl();
+function el(t, a) {
+  const e = document.createElementNS(SVGNS, t);
+  for (const k in a) e.setAttribute(k, a[k]);
+  return e;
+}
+function txt(e, s) { e.textContent = s; return e; }
+function showTip(html, evt) { tip.innerHTML = html; tip.style.opacity = 1; moveTip(evt); }
+function moveTip(evt) {
+  const x = evt.clientX, y = evt.clientY;
+  tip.style.left = Math.min(x + 14, innerWidth - tip.offsetWidth - 10) + 'px';
+  tip.style.top = (y - 10 - tip.offsetHeight) + 'px';
+  if (parseFloat(tip.style.top) < 10) tip.style.top = (y + 18) + 'px';
+}
+function hideTip() { tip.style.opacity = 0; }
+function lerp(a, b, t) { return a + (b - a) * t; }
+function ease(t) { return t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
+function animate(dur, cb, done) {
+  const s = performance.now();
+  (function f(n) { const t = Math.min(1, (n - s) / dur); cb(ease(t)); if (t < 1) requestAnimationFrame(f); else if (done) done(); })(performance.now());
+}
+
+(function () {
+  // [name, height_cm, weight_kg, athletes, category]
+  const D = [
+    ["Gymnastics",   162, 56, 324,  "C"],
+    ["Diving",       167, 60, 140,  "C"],
+    ["Weightlifting",167, 80, 260,  "C"],
+    ["Basketball",   192, 88, 288,  "T"],
+    ["Volleyball",   190, 80, 288,  "T"],
+    ["Water Polo",   186, 85, 338,  "T"],
+    ["Rowing",       185, 82, 550,  "T"],
+    ["Handball",     186, 84, 336,  "T"],
+    ["Athletics",    176, 69, 2300, "X"],
+    ["Swimming",     180, 73, 900,  "X"],
+    ["Football",     178, 73, 500,  "X"],
+    ["Cycling",      177, 69, 520,  "X"],
+    ["Boxing",       174, 69, 286,  "X"],
+    ["Judo",         174, 78, 386,  "X"],
+    ["Wrestling",    173, 79, 344,  "X"],
+    ["Fencing",      177, 71, 210,  "X"],
+    ["Hockey",       175, 70, 400,  "X"],
+    ["Shooting",     175, 76, 390,  "X"],
+    ["Triathlon",    176, 64, 110,  "X"],
+    ["Canoe",        179, 77, 330,  "X"],
+  ];
+  D.forEach(s => { s.bmi = s[2] / Math.pow(s[1] / 100, 2); });
+
+  const catCol  = { C: "#d6248f", T: "#2f7ed8", X: "#e8821e" };
+  const catName = { C: "Compact builds", T: "Tall & powerful", X: "Typical core" };
+
+  const BMI_ZONES = [
+    { lo: 14,   hi: 21.5, fill: "#daeef8", label: "Lean  (BMI < 21.5)" },
+    { lo: 21.5, hi: 25,   fill: "#d9f0e4", label: "Athletic  (21.5 – 25)" },
+    { lo: 25,   hi: 34,   fill: "#fdefd8", label: "Powerful  (BMI > 25)" },
+  ];
+  const BMI_LINES = [20, 22, 24, 26, 28];
+
+  const FULL = [[157, 198], [47, 96]];
+  const CORE = [[170, 183], [61, 85]];
+
+  const svg = document.getElementById('svg-body');
+  const sidePanelEl = document.getElementById('side-panel');
+  const m = { l: 56, r: 18, t: 20, b: 48 };
+
+  let dom = [FULL[0].slice(), FULL[1].slice()];
+  let zoomed = false, isoIdx = null, activeCat = null, rankMetric = 'height';
+
+  function W() { return svg.clientWidth  || 1080; }
+  function H() { return svg.clientHeight || 660;  }
+  function Xf(x) { return m.l + (x - dom[0][0]) / (dom[0][1] - dom[0][0]) * (W() - m.l - m.r); }
+  function Yf(y) { return H() - m.b - (y - dom[1][0]) / (dom[1][1] - dom[1][0]) * (H() - m.t - m.b); }
+  function bmiW(bmi, h) { return bmi * Math.pow(h / 100, 2); }
+
+  // ── DRAW ──────────────────────────────────────────────────────────────────
+  function draw() {
+    svg.setAttribute("viewBox", `0 0 ${W()} ${H()}`);
+    svg.innerHTML = '';
+
+    const xr = dom[0], yr = dom[1];
+
+    // Clip rect
+    const defs = el('defs', {});
+    const cp = el('clipPath', { id: 'pc' });
+    cp.appendChild(el('rect', { x: m.l, y: m.t, width: W() - m.l - m.r, height: H() - m.t - m.b }));
+    defs.appendChild(cp);
+    svg.appendChild(defs);
+
+    // BMI zone bands
+    BMI_ZONES.forEach(z => {
+      const h0 = xr[0], h1 = xr[1];
+      const pts = [
+        Xf(h0), Yf(bmiW(z.hi, h0)),
+        Xf(h1), Yf(bmiW(z.hi, h1)),
+        Xf(h1), Yf(bmiW(z.lo, h1)),
+        Xf(h0), Yf(bmiW(z.lo, h0)),
+      ];
+      svg.appendChild(el('polygon', {
+        points: `${pts[0]},${pts[1]} ${pts[2]},${pts[3]} ${pts[4]},${pts[5]} ${pts[6]},${pts[7]}`,
+        fill: z.fill, opacity: 0.9, 'clip-path': 'url(#pc)'
+      }));
+    });
+
+    // BMI isolines + labels
+    BMI_LINES.forEach(bmi => {
+      const h0 = xr[0], h1 = xr[1];
+      const w0 = bmiW(bmi, h0), w1 = bmiW(bmi, h1);
+      // only draw if line intersects the view
+      if (w1 < yr[0] || w0 > yr[1]) return;
+      svg.appendChild(el('line', {
+        x1: Xf(h0), y1: Yf(w0), x2: Xf(h1), y2: Yf(w1),
+        stroke: '#aaa', 'stroke-width': 0.7, 'stroke-dasharray': '4 3',
+        'clip-path': 'url(#pc)'
+      }));
+      // label at right edge, only if within yr
+      if (w1 >= yr[0] && w1 <= yr[1]) {
+        const lx = Xf(h1) - 2, ly = Yf(w1) - 4;
+        svg.appendChild(txt(el('text', { x: lx, y: ly, 'text-anchor': 'end', 'font-size': '10.5', fill: '#999', 'font-style': 'italic', 'clip-path': 'url(#pc)' }), `BMI ${bmi}`));
+      }
+    });
+
+    // Grid lines
+    const xs = Math.ceil(xr[0] / 5) * 5;
+    for (let v = xs; v <= xr[1]; v += 5) {
+      const x = Xf(v);
+      svg.appendChild(el('line', { x1: x, y1: m.t, x2: x, y2: H() - m.b, stroke: '#e6e9f0', 'stroke-width': 1 }));
+      svg.appendChild(txt(el('text', { x, y: H() - m.b + 17, 'text-anchor': 'middle', class: 'tlab' }), v));
+    }
+    const ys = Math.ceil(yr[0] / 5) * 5;
+    for (let v = ys; v <= yr[1]; v += 5) {
+      const y = Yf(v);
+      svg.appendChild(el('line', { x1: m.l, y1: y, x2: W() - m.r, y2: y, stroke: '#e6e9f0', 'stroke-width': 1 }));
+      svg.appendChild(txt(el('text', { x: m.l - 7, y: y + 4, 'text-anchor': 'end', class: 'tlab' }), v));
+    }
+
+    // Axis labels
+    svg.appendChild(txt(el('text', { x: (m.l + W() - m.r) / 2, y: H() - 6, 'text-anchor': 'middle', class: 'axlbl' }), 'Average height (cm)'));
+    svg.appendChild(txt(el('text', { x: 13, y: (m.t + H() - m.b) / 2, 'text-anchor': 'middle', class: 'axlbl', transform: `rotate(-90 13 ${(m.t + H() - m.b) / 2})` }), 'Average weight (kg)'));
+
+    // Zoom box hint in full view
+    if (!zoomed) {
+      const bx  = Xf(CORE[0][0]), bx2 = Xf(CORE[0][1]);
+      const by  = Yf(CORE[1][1]), by2 = Yf(CORE[1][0]);
+      const box = el('rect', { x: bx, y: by, width: bx2 - bx, height: by2 - by,
+        fill: 'rgba(106,78,163,0.04)', stroke: '#6a4ea3', 'stroke-width': 1.4,
+        'stroke-dasharray': '5 4', rx: 6, cursor: 'pointer' });
+      box.addEventListener('click', zoomIn);
+      box.addEventListener('mouseenter', e => showTip('<b>Core cluster</b><br>12+ sports — click to zoom in', e));
+      box.addEventListener('mousemove', moveTip);
+      box.addEventListener('mouseleave', hideTip);
+      svg.appendChild(box);
+      svg.appendChild(txt(el('text', { x: (bx + bx2) / 2, y: by - 5, 'text-anchor': 'middle',
+        fill: '#6a4ea3', 'font-size': '12', 'font-weight': '700' }), 'click to zoom ↓'));
+    }
+
+    // Build item list
+    const items = [];
+    D.forEach((s, i) => {
+      const inView = s[1] >= xr[0] - 1 && s[1] <= xr[1] + 1 && s[2] >= yr[0] - 1 && s[2] <= yr[1] + 1;
+      if (!inView) return;
+      const dim = (isoIdx !== null && isoIdx !== i) || (activeCat && activeCat !== s[4]);
+      const r   = Math.max(6, 7 + Math.sqrt(s[3]) / (zoomed ? 2.2 : 3.2));
+      items.push({ s, i, dim, r, cx: Xf(s[1]), cy: Yf(s[2]) });
+    });
+
+    // Zoomed labels: place above circle then push apart
+    if (zoomed) {
+      items.forEach(it => { it.lx = it.cx; it.ly = it.cy - it.r - 5; it.anchor = 'middle'; });
+      const CW = 7, CH = 14;
+      for (let iter = 0; iter < 40; iter++) {
+        for (let a = 0; a < items.length; a++) {
+          for (let b = a + 1; b < items.length; b++) {
+            const la = items[a], lb = items[b];
+            const needX = (la.s[0].length + lb.s[0].length) * CW / 2 + 10;
+            const needY = CH;
+            const dx = la.lx - lb.lx, dy = la.ly - lb.ly;
+            if (Math.abs(dx) < needX && Math.abs(dy) < needY) {
+              if (Math.abs(dx) > Math.abs(dy)) {
+                const push = (needX - Math.abs(dx)) / 2 + 1;
+                la.lx += dx >= 0 ? push : -push; lb.lx -= dx >= 0 ? push : -push;
+              } else {
+                const push = (needY - Math.abs(dy)) / 2 + 1.5;
+                la.ly += dy >= 0 ? push : -push; lb.ly -= dy >= 0 ? push : -push;
+              }
+            }
+          }
+        }
+      }
+      // Leader lines
+      items.forEach(it => {
+        const dist = Math.sqrt(Math.pow(it.lx - it.cx, 2) + Math.pow(it.ly - (it.cy - it.r), 2));
+        if (dist > 4) {
+          svg.appendChild(el('line', {
+            x1: it.cx, y1: it.cy - it.r - 1, x2: it.lx, y2: it.ly + 2,
+            stroke: '#c0c8d8', 'stroke-width': 0.9, opacity: it.dim ? 0.15 : 0.65
+          }));
+        }
+      });
+    }
+
+    // Circles
+    items.forEach(it => {
+      const c = el('circle', {
+        cx: it.cx, cy: it.cy, r: it.r,
+        fill: catCol[it.s[4]], opacity: it.dim ? 0.1 : 0.72,
+        stroke: '#fff', 'stroke-width': 1.8, cursor: 'pointer'
+      });
+      c.addEventListener('mouseenter', e => {
+        if (!it.dim) c.setAttribute('opacity', 0.95);
+        showTip(`<b>${it.s[0]}</b><br><span class="k">Height:</span> ${it.s[1]} cm &nbsp;<span class="k">Weight:</span> ${it.s[2]} kg<br><span class="k">BMI:</span> ${it.s.bmi.toFixed(1)} &nbsp;<span class="k">Athletes:</span> ${it.s[3]}<br><span class="k">${catName[it.s[4]]}</span>`, e);
+      });
+      c.addEventListener('mousemove', moveTip);
+      c.addEventListener('mouseleave', () => { c.setAttribute('opacity', it.dim ? 0.1 : 0.72); hideTip(); });
+      c.addEventListener('click', ev => {
+        ev.stopPropagation();
+        isoIdx = (isoIdx === it.i) ? null : it.i;
+        draw(); updateSide();
+        document.getElementById('rev-body').textContent = isoIdx !== null
+          ? `${it.s[0]}: ${it.s[1]} cm · ${it.s[2]} kg · BMI ${it.s.bmi.toFixed(1)} · ${it.s[3]} athletes — ${catName[it.s[4]]}.`
+          : '';
+      });
+      svg.appendChild(c);
+    });
+
+    // Zoomed labels (drawn on top of circles)
+    if (zoomed) {
+      items.forEach(it => {
+        svg.appendChild(txt(el('text', {
+          x: it.lx, y: it.ly, 'text-anchor': it.anchor, class: 'tlab',
+          'font-weight': '600', opacity: it.dim ? 0.2 : 1
+        }), it.s[0]));
+      });
+    }
+
+    // Category legend (top-left, inside plot)
+    let lx = m.l + 6;
+    ["C", "T", "X"].forEach(k => {
+      svg.appendChild(el('circle', { cx: lx + 5, cy: m.t + 7, r: 5, fill: catCol[k] }));
+      svg.appendChild(txt(el('text', { x: lx + 14, y: m.t + 11, class: 'tlab', 'font-weight': '600' }), catName[k]));
+      lx += catName[k].length * 6.5 + 28;
+    });
+  }
+
+  // ── SIDE PANEL ────────────────────────────────────────────────────────────
+  function updateSide() {
+    sidePanelEl.innerHTML = '';
+
+    // Stat summary
+    const scope = isoIdx !== null ? [D[isoIdx]]
+                : activeCat ? D.filter(s => s[4] === activeCat)
+                : D;
+    const avgH  = (scope.reduce((a, s) => a + s[1], 0) / scope.length).toFixed(1);
+    const avgW  = (scope.reduce((a, s) => a + s[2], 0) / scope.length).toFixed(1);
+    const avgB  = (scope.reduce((a, s) => a + s.bmi, 0) / scope.length).toFixed(1);
+    const total = scope.reduce((a, s) => a + s[3], 0);
+    const scopeLabel = isoIdx !== null ? D[isoIdx][0]
+                     : activeCat ? catName[activeCat] : 'All sports';
+
+    const statBox = document.createElement('div');
+    statBox.className = 'panel-box';
+    statBox.innerHTML = `<h3>${scopeLabel}</h3>
+      <div class="stat-grid">
+        <div class="stat-item"><div class="stat-val">${avgH}</div><div class="stat-lbl">Avg height cm</div></div>
+        <div class="stat-item"><div class="stat-val">${avgW}</div><div class="stat-lbl">Avg weight kg</div></div>
+        <div class="stat-item"><div class="stat-val">${avgB}</div><div class="stat-lbl">Avg BMI</div></div>
+        <div class="stat-item"><div class="stat-val">${total >= 1000 ? (total/1000).toFixed(1)+'k' : total}</div><div class="stat-lbl">Athletes</div></div>
+      </div>`;
+    sidePanelEl.appendChild(statBox);
+
+    // Ranked list
+    const rankBox = document.createElement('div');
+    rankBox.className = 'panel-box';
+    rankBox.style.cssText = 'flex:1;overflow:hidden;display:flex;flex-direction:column;';
+
+    const metricRow = document.createElement('div');
+    metricRow.className = 'metric-row';
+    const ml = document.createElement('span');
+    ml.className = 'metric-lbl';
+    ml.textContent = 'Rank by';
+    metricRow.appendChild(ml);
+    ['height', 'weight', 'BMI'].forEach(m => {
+      const b = document.createElement('button');
+      b.className = 'mbtn' + (rankMetric === m ? ' on' : '');
+      b.textContent = m;
+      b.onclick = () => { rankMetric = m; updateSide(); };
+      metricRow.appendChild(b);
+    });
+    rankBox.appendChild(metricRow);
+
+    const sorted = D.slice().sort((a, b) => {
+      if (rankMetric === 'height') return b[1] - a[1];
+      if (rankMetric === 'weight') return b[2] - a[2];
+      return b.bmi - a.bmi;
+    });
+    const vals = sorted.map(s => rankMetric === 'height' ? s[1] : rankMetric === 'weight' ? s[2] : s.bmi);
+    const minV = Math.min(...vals), maxV = Math.max(...vals);
+
+    const list = document.createElement('div');
+    list.className = 'rank-list';
+    list.style.cssText = 'overflow-y:auto;flex:1;';
+    sorted.forEach(s => {
+      const sidx = D.indexOf(s);
+      const val  = rankMetric === 'height' ? s[1] : rankMetric === 'weight' ? s[2] : s.bmi;
+      const pct  = ((val - minV) / (maxV - minV) * 100).toFixed(0);
+      const row  = document.createElement('div');
+      row.className = 'rank-row' + (isoIdx === sidx ? ' active' : '');
+      if (activeCat && s[4] !== activeCat) row.style.opacity = '0.25';
+      row.innerHTML = `
+        <div class="rank-dot" style="background:${catCol[s[4]]}"></div>
+        <div class="rank-name">${s[0]}</div>
+        <div class="rank-bar-wrap"><div class="rank-bar" style="width:${pct}%;background:${catCol[s[4]]}"></div></div>
+        <div class="rank-val">${rankMetric === 'BMI' ? val.toFixed(1) : val}</div>`;
+      row.addEventListener('click', () => {
+        isoIdx = (isoIdx === sidx) ? null : sidx;
+        draw(); updateSide();
+        document.getElementById('rev-body').textContent = isoIdx !== null
+          ? `${s[0]}: ${s[1]} cm · ${s[2]} kg · BMI ${s.bmi.toFixed(1)} · ${s[3]} athletes — ${catName[s[4]]}.`
+          : '';
+      });
+      list.appendChild(row);
+    });
+    rankBox.appendChild(list);
+    sidePanelEl.appendChild(rankBox);
+
+    // BMI zone legend
+    const bmiBox = document.createElement('div');
+    bmiBox.className = 'panel-box';
+    bmiBox.innerHTML = `<h3>BMI zones</h3><div class="bmi-legend">
+      <div class="bmi-row"><div class="bmi-swatch" style="background:#daeef8"></div>Lean (BMI &lt; 21.5)</div>
+      <div class="bmi-row"><div class="bmi-swatch" style="background:#d9f0e4"></div>Athletic (21.5 – 25)</div>
+      <div class="bmi-row"><div class="bmi-swatch" style="background:#fdefd8"></div>Powerful (BMI &gt; 25)</div>
+    </div>`;
+    sidePanelEl.appendChild(bmiBox);
+  }
+
+  // ── ZOOM ──────────────────────────────────────────────────────────────────
+  function zoomIn() {
+    if (zoomed) return;
+    zoomed = true; hideTip(); ctl();
+    const from = [dom[0].slice(), dom[1].slice()];
+    animate(750, t => {
+      dom = [[lerp(from[0][0], CORE[0][0], t), lerp(from[0][1], CORE[0][1], t)],
+             [lerp(from[1][0], CORE[1][0], t), lerp(from[1][1], CORE[1][1], t)]];
+      draw();
+    }, () => {
+      document.getElementById('rev-body').textContent = 'Zoomed into the core — wrestling, judo, swimming, athletics each have distinct height/weight and BMI profiles despite similar averages.';
+    });
+  }
+
+  function zoomOut() {
+    zoomed = false; isoIdx = null; hideTip(); ctl();
+    const from = [dom[0].slice(), dom[1].slice()];
+    animate(650, t => {
+      dom = [[lerp(from[0][0], FULL[0][0], t), lerp(from[0][1], FULL[0][1], t)],
+             [lerp(from[1][0], FULL[1][0], t), lerp(from[1][1], FULL[1][1], t)]];
+      draw();
+    }, () => { document.getElementById('rev-body').textContent = ''; updateSide(); });
+  }
+
+  // ── CONTROLS ──────────────────────────────────────────────────────────────
+  function ctl() {
+    const host = document.getElementById('ctl-body');
+    host.innerHTML = '';
+    if (zoomed) {
+      const back = document.createElement('button');
+      back.className = 'btn back'; back.textContent = '← Zoom out';
+      back.onclick = zoomOut;
+      host.appendChild(back);
+    }
+    ["C", "T", "X"].forEach(k => {
+      const b = document.createElement('button');
+      b.className = 'btn cat-' + k + (activeCat === k ? ' on' : '');
+      b.textContent = catName[k];
+      b.onclick = () => { activeCat = (activeCat === k) ? null : k; ctl(); draw(); updateSide(); };
+      host.appendChild(b);
+    });
+  }
+
+  // Click background to deselect
+  svg.addEventListener('click', () => {
+    if (isoIdx !== null) { isoIdx = null; draw(); updateSide(); document.getElementById('rev-body').textContent = ''; }
+  });
+  window.addEventListener('resize', draw);
+  addEventListener('scroll', hideTip, { passive: true });
+
+  draw(); ctl(); updateSide();
 })();
-addEventListener('scroll',hideTip,{passive:true});
 </script>
-</body></html>
+</body>
+</html>
